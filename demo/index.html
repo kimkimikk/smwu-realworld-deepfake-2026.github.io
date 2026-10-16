@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>딥페이크 탐지 시스템</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --bg2: #ffffff;
+    --bg3: #eef1f6;
+    --text: #1a202c;
+    --text2: #4a5568;
+    --text3: #8a96a8;
+    --accent: #4f8ef7;
+    --accent2: #2563eb;
+    --fake: #e11d2e;
+    --fake-bg: rgba(225,29,46,0.07);
+    --real: #16a34a;
+    --real-bg: rgba(22,163,74,0.08);
+    --radius: 10px;
+    --radius-lg: 16px;
+    --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum";
+  }
+  button, select { font-family: inherit; }
+
+  /* 상단바 */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; padding: 0 28px; background: var(--bg2);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .logo-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--accent2); display: grid; place-items: center; }
+  .logo-icon svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .api-badge { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
+  .api-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+  .api-dot.ok { background: var(--real); }
+  .api-dot.busy { background: #f59e0b; }
+  .api-dot.err { background: var(--fake); }
+  .model-select {
+    background: var(--bg3); border: none; color: var(--text); font-size: 14px; font-weight: 500;
+    padding: 8px 34px 8px 14px; border-radius: var(--radius); cursor: pointer; outline: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a5568'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+  }
+  .model-select:focus-visible, .run-btn:focus-visible, .upload-zone:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 2px; }
+
+  .main { max-width: 1080px; margin: 0 auto; padding: 32px 24px 60px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* 입력 */
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: var(--bg2); border-radius: var(--radius-lg); overflow: hidden; }
+  .panel-header { padding: 18px 20px 0; font-size: 15px; font-weight: 600; }
+  .panel-body { padding: 14px 20px 20px; }
+
+  .upload-zone {
+    background: var(--bg3); border: 2px dashed transparent; border-radius: var(--radius);
+    padding: 36px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    cursor: pointer; transition: border-color .15s; min-height: 220px; justify-content: center;
+  }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); }
+  .upload-zone svg { width: 32px; height: 32px; fill: none; stroke: var(--text3); stroke-width: 1.5; }
+  .up-label { font-size: 15px; color: var(--text2); }
+  .up-sub { font-size: 13px; color: var(--text3); }
+  .file-btn {
+    margin-top: 6px; padding: 8px 18px; background: var(--bg2); border: none; border-radius: var(--radius);
+    color: var(--text2); font-size: 14px; cursor: pointer;
+  }
+  .file-btn:hover { color: var(--accent2); }
+
+  .preview-area {
+    background: var(--bg3); border-radius: var(--radius); height: 180px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px;
+  }
+  .preview-area img { max-width: 100%; max-height: 100%; object-fit: contain; display: none; }
+  .placeholder { text-align: center; }
+  .placeholder svg { width: 28px; height: 28px; stroke: var(--text3); fill: none; stroke-width: 1.5; }
+  .placeholder p { font-size: 13px; color: var(--text3); margin-top: 6px; }
+  .img-meta { font-size: 13px; color: var(--text3); text-align: center; margin-bottom: 12px; min-height: 18px; }
+  .run-btn {
+    width: 100%; padding: 13px; background: var(--accent2); border: none; border-radius: var(--radius);
+    color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .run-btn:hover { background: var(--accent); }
+  .run-btn svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; }
+  .run-btn:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; }
+  .run-btn:disabled svg { stroke: var(--text3); }
+
+  /* 알림 */
+  .notice { display: none; padding: 13px 16px; border-radius: var(--radius); font-size: 14px; line-height: 1.5; }
+  .notice.show { display: block; }
+  .notice.warn { background: #fff4e0; color: #8a4b00; }
+  .notice.error { background: var(--fake-bg); color: #9b1c1c; }
+
+  .empty-state { background: var(--bg2); border-radius: var(--radius-lg); padding: 44px; text-align: center; color: var(--text3); font-size: 15px; line-height: 1.7; }
+
+  /* 결과 */
+  .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .section-title { font-size: 18px; font-weight: 600; }
+  .section-sub { font-size: 13px; color: var(--text3); }
+
+  .result-panel { background: var(--bg2); border-radius: var(--radius-lg); overflow: hidden; }
+  .result-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 0; }
+  .result-label { font-size: 16px; font-weight: 600; }
+  .tag { font-size: 12px; font-weight: 500; color: var(--accent2); background: rgba(37,99,235,0.08); padding: 4px 10px; border-radius: 999px; }
+  .result-body { padding: 16px 20px 22px; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
+  .result-col { display: flex; flex-direction: column; gap: 16px; }
+
+  .verdict { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: var(--radius); background: var(--bg3); }
+  .verdict.fake { background: var(--fake-bg); }
+  .verdict.real { background: var(--real-bg); }
+  .verdict svg { width: 24px; height: 24px; fill: none; stroke-width: 2; flex-shrink: 0; }
+  .verdict.fake svg { stroke: var(--fake); }
+  .verdict.real svg { stroke: var(--real); }
+  .verdict-text { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .verdict.fake .verdict-text { color: var(--fake); }
+  .verdict.real .verdict-text { color: var(--real); }
+  .verdict-conf { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  .conf-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 14px; }
+  .conf-lbl { color: var(--text2); }
+  .conf-num { font-weight: 600; }
+  .bar-bg { height: 6px; background: var(--bg3); border-radius: 3px; margin-bottom: 12px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(0.4,0,0.2,1); }
+  .bar-fake { background: var(--fake); }
+  .bar-real { background: var(--real); }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+
+  .gcam-label { font-size: 14px; color: var(--text2); font-weight: 500; margin-bottom: 8px; }
+  .gcam-wrap { background: var(--bg3); border-radius: var(--radius); aspect-ratio: 1 / 1; max-height: 340px; margin: 0 auto; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .gcam-img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .gcam-placeholder p { font-size: 13px; color: var(--text3); }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .legend-bar { height: 4px; flex: 1; border-radius: 2px; background: linear-gradient(to right, #3b82f6, #22c55e, #f59e0b, #ef4444); }
+  .legend-txt { font-size: 12px; color: var(--text3); }
+
+  /* 비교 표 */
+  .history { margin-top: 20px; }
+  .history table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .history th { text-align: left; font-weight: 500; color: var(--text3); font-size: 13px; padding: 12px 20px 8px; }
+  .history td { padding: 12px 20px; border-top: 1px solid var(--bg3); }
+  .history tr.current td { background: rgba(37,99,235,0.04); font-weight: 600; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.fake { background: var(--fake-bg); color: var(--fake); }
+  .pill.real { background: var(--real-bg); color: var(--real); }
+  .pill.none { background: var(--bg3); color: var(--text3); }
+  .prob-cell { display: flex; align-items: center; gap: 10px; }
+  .prob-bar { width: 90px; height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .prob-bar div { height: 100%; background: var(--fake); }
+
+  /* 로딩 */
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(245,247,250,0.75); display: none;
+    align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(6px);
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-box { background: var(--bg2); border-radius: var(--radius-lg); padding: 28px 40px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 10px 40px rgba(26,32,44,0.08); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--bg3); border-top-color: var(--accent2); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 15px; color: var(--text2); }
+
+  @media (max-width: 760px) {
+    .input-row, .result-grid { grid-template-columns: 1fr; }
+    .api-badge span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+    딥페이크 탐지 시스템
+  </div>
+  <div class="topbar-right">
+    <div class="api-badge"><div class="api-dot" id="api-dot"></div><span id="api-txt">AWS 대기</span></div>
+    <select class="model-select" id="model-select" aria-label="모델 선택">
+      <option value="moe_ffd">MoE-FFD (baseline)</option>
+      <option value="aug_only">JPEG Aug only</option>
+      <option value="v4">Phase consistency</option>
+      <option value="augphase" selected>Phase + JPEG Aug</option>
+    </select>
+  </div>
+</header>
+
+<div class="loading-overlay" id="loading"><div class="loading-box"><div class="spinner"></div><div class="loading-text" id="loading-text">탐지 중</div></div></div>
+
+<main class="main">
+  <div class="input-row">
+    <div class="panel">
+      <div class="panel-header">이미지 업로드</div>
+      <div class="panel-body">
+        <div class="upload-zone" id="upload-zone" tabindex="0" role="button" aria-label="이미지 선택">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span class="up-label">이미지를 드래그하거나 클릭해서 업로드</span>
+          <span class="up-sub">JPG, PNG, WebP (최대 10MB)</span>
+          <button class="file-btn" id="file-btn" type="button">파일 선택</button>
+        </div>
+        <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" hidden>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">미리보기</div>
+      <div class="panel-body">
+        <div class="preview-area">
+          <img id="preview-img" alt="미리보기">
+          <div class="placeholder" id="placeholder">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p>업로드된 이미지 없음</p>
+          </div>
+        </div>
+        <div class="img-meta" id="img-meta"></div>
+        <button class="run-btn" id="run-btn" disabled>
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="run-label">탐지 실행</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results-section">
+    <div class="notice" id="notice"></div>
+
+    <div class="empty-state" id="empty-state">
+      모델을 선택하고 이미지를 업로드한 뒤 탐지를 실행하세요.<br>같은 이미지로 모델을 바꿔가며 실행하면 아래에 결과가 누적 비교됩니다.
+    </div>
+
+    <div id="result-view" style="display:none;">
+      <div class="section-header">
+        <div class="section-title">탐지 결과</div>
+        <span class="section-sub" id="result-sub"></span>
+      </div>
+
+      <div class="result-panel">
+        <div class="result-header">
+          <span class="result-label" id="result-model-name">-</span>
+          <span class="tag">AWS SageMaker</span>
+        </div>
+        <div class="result-body">
+          <div class="result-grid">
+            <div class="result-col">
+              <div class="verdict" id="verdict">
+                <svg viewBox="0 0 24 24" id="verdict-icon"></svg>
+                <div>
+                  <div class="verdict-text" id="verdict-text">-</div>
+                  <div class="verdict-conf" id="verdict-conf">-</div>
+                </div>
+              </div>
+              <div>
+                <div class="conf-row"><span class="conf-lbl">Fake</span><span class="conf-num" id="fake-num">-</span></div>
+                <div class="bar-bg"><div class="bar-fill bar-fake" id="fake-bar" style="width:0%"></div></div>
+                <div class="conf-row"><span class="conf-lbl">Real</span><span class="conf-num" id="real-num">-</span></div>
+                <div class="bar-bg"><div class="bar-fill bar-real" id="real-bar" style="width:0%"></div></div>
+              </div>
+            </div>
+            <div class="result-col">
+              <div>
+                <div class="gcam-label">Grad-CAM (모델이 주목한 영역)</div>
+                <div class="gcam-wrap">
+                  <img class="gcam-img" id="gcam-img" alt="Grad-CAM 히트맵">
+                  <div class="gcam-placeholder" id="gcam-placeholder"><p>히트맵 불러오는 중</p></div>
+                </div>
+                <div class="legend-row"><span class="legend-txt">낮음</span><div class="legend-bar"></div><span class="legend-txt">높음</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel history">
+        <div class="panel-header">같은 이미지, 모델별 비교</div>
+        <div id="history-body"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── AWS API 설정 ──
+const API_URL = 'https://ym5bcl01rb.execute-api.ap-northeast-2.amazonaws.com';
+const MAX_RETRY = 5;          // 서버리스 콜드스타트 대비 재시도 횟수
+const RETRY_WAIT_MS = 8000;
+
+const $ = id => document.getElementById(id);
+const fileInput = $('file-input');
+const uploadZone = $('upload-zone');
+const runBtn = $('run-btn');
+const modelSelect = $('model-select');
+
+let currentFile = null;
+let uploaded = null;          // { file, jobId, key } : 같은 이미지는 재업로드 없이 재사용
+let history = [];
+
+const modelName = v => modelSelect.querySelector(`option[value="${v}"]`).textContent;
+
+// ── 파일 선택 ──
+function handleFile(file) {
+  if (!file) return;
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return showNotice('error', 'JPG, PNG, WebP 이미지만 지원해요.');
+  if (file.size > 10 * 1024 * 1024) return showNotice('error', '10MB 이하 이미지만 올릴 수 있어요.');
+  currentFile = file;
+  uploaded = null;
+  history = [];
+  $('preview-img').src = URL.createObjectURL(file);
+  $('preview-img').style.display = 'block';
+  $('placeholder').style.display = 'none';
+  $('img-meta').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  $('result-view').style.display = 'none';
+  $('empty-state').style.display = 'block';
+  hideNotice();
+  runBtn.disabled = false;
+  updateRunLabel();
+}
+
+fileInput.addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value = ''; });
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+$('file-btn').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+modelSelect.addEventListener('change', updateRunLabel);
+
+function updateRunLabel() { $('run-label').textContent = `${modelName(modelSelect.value)}로 탐지 실행`; }
+
+// ── 알림 ──
+function showNotice(type, msg) { $('notice').className = `notice show ${type}`; $('notice').textContent = msg; }
+function hideNotice() { $('notice').className = 'notice'; }
+function setApiStatus(state, text) { $('api-dot').className = `api-dot ${state}`; $('api-txt').textContent = text; }
+
+// ── API 호출 ──
+async function postJson(path, body) {
+  const r = await fetch(API_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  return { status: r.status, data };
+}
+
+async function uploadImage(file) {
+  $('loading-text').textContent = '업로드 주소 발급 중';
+  const { status, data } = await postJson('/upload-url', { contentType: file.type });
+  if (status !== 200) throw new Error(data.error || `업로드 주소 발급 실패 (${status})`);
+  $('loading-text').textContent = '이미지 업로드 중';
+  const put = await fetch(data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+  if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
+  return { file, jobId: data.jobId, key: data.key };
+}
+
+async function detect(up, model) {
+  for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+    $('loading-text').textContent = attempt === 1
+      ? `${modelName(model)} 추론 중`
+      : `서버 깨우는 중 (${attempt - 1}/${MAX_RETRY - 1}), 첫 요청은 최대 1분 걸려요`;
+    try {
+      const res = await postJson('/detect', { jobId: up.jobId, key: up.key, model });
+      if (res.status !== 503 && res.status !== 504) return res;
+    } catch (e) {
+      if (attempt === MAX_RETRY) throw e;   // 게이트웨이 타임아웃은 네트워크 오류로 보일 수 있어 재시도
+    }
+    setApiStatus('busy', 'AWS 깨우는 중');
+    await new Promise(r => setTimeout(r, RETRY_WAIT_MS));
+  }
+  throw new Error('서버 응답 시간이 초과됐어요. 잠시 후 다시 시도해주세요.');
+}
+
+// ── 실행 ──
+runBtn.addEventListener('click', async () => {
+  if (!currentFile) return;
+  const model = modelSelect.value;
+  hideNotice();
+  $('loading').classList.add('show');
+  runBtn.disabled = true;
+  const t0 = performance.now();
+  try {
+    if (!uploaded || uploaded.file !== currentFile) uploaded = await uploadImage(currentFile);
+    const { status, data } = await detect(uploaded, model);
+    const sec = (performance.now() - t0) / 1000;
+    setApiStatus('ok', 'AWS 연결됨');
+
+    if (status !== 200) {
+      const msg = (data.error || '').includes('엔드포인트에 없')
+        ? `${modelName(model)} 모델은 아직 배포되지 않았어요. 다른 모델을 선택해주세요.`
+        : (data.error || `요청 실패 (${status})`);
+      showNotice('warn', msg);
+      return;
+    }
+    if (!data.face_found) {
+      showNotice('warn', '이미지에서 얼굴을 찾지 못했어요. 얼굴이 크고 선명하게 나온 사진으로 다시 시도해주세요.');
+      recordHistory({ model, verdict: 'NO_FACE', prob: null, sec });
+      return;
+    }
+    renderResult(model, data, sec);
+    recordHistory({ model, verdict: data.verdict, prob: data.fake_prob, sec });
+  } catch (e) {
+    console.error(e);
+    setApiStatus('err', 'AWS 오류');
+    showNotice('error', e.message || '요청 중 오류가 발생했어요.');
+  } finally {
+    $('loading').classList.remove('show');
+    runBtn.disabled = false;
+  }
+});
+
+// ── 결과 표시 ──
+function renderResult(model, d, sec) {
+  $('empty-state').style.display = 'none';
+  $('result-view').style.display = 'block';
+  $('result-model-name').textContent = modelName(model);
+  $('result-sub').textContent = `${currentFile.name}, ${sec.toFixed(1)}초`;
+
+  const isFake = d.verdict === 'FAKE';
+  const fakePct = d.fake_prob * 100;
+  $('verdict').className = 'verdict ' + (isFake ? 'fake' : 'real');
+  $('verdict-icon').innerHTML = isFake
+    ? '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+    : '<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>';
+  $('verdict-text').textContent = isFake ? 'FAKE' : 'REAL';
+  $('verdict-conf').textContent = `Fake 확률 ${fakePct.toFixed(1)}%, 판정 기준 ${d.threshold}`;
+
+  $('fake-num').textContent = fakePct.toFixed(1) + '%';
+  $('real-num').textContent = (100 - fakePct).toFixed(1) + '%';
+  $('fake-bar').style.width = '0%';
+  $('real-bar').style.width = '0%';
+  setTimeout(() => { $('fake-bar').style.width = fakePct + '%'; $('real-bar').style.width = (100 - fakePct) + '%'; }, 100);
+
+  const img = $('gcam-img');
+  img.style.display = 'none';
+  $('gcam-placeholder').style.display = 'block';
+  $('gcam-placeholder').querySelector('p').textContent = '히트맵 불러오는 중';
+  if (d.gradcamUrl) {
+    img.onload = () => { img.style.display = 'block'; $('gcam-placeholder').style.display = 'none'; };
+    img.onerror = () => { $('gcam-placeholder').querySelector('p').textContent = '히트맵을 불러오지 못했어요'; };
+    img.src = d.gradcamUrl;
+  }
+}
+
+function recordHistory(entry) {
+  history = history.filter(h => h.model !== entry.model).concat(entry);
+  $('result-view').style.display = 'block';
+  $('empty-state').style.display = 'none';
+  const rows = history.map(h => {
+    const pill = h.verdict === 'FAKE' ? 'fake' : h.verdict === 'REAL' ? 'real' : 'none';
+    const label = h.verdict === 'NO_FACE' ? '얼굴 없음' : h.verdict;
+    const prob = h.prob == null ? '-' :
+      `<div class="prob-cell"><div class="prob-bar"><div style="width:${(h.prob * 100).toFixed(1)}%"></div></div>${(h.prob * 100).toFixed(1)}%</div>`;
+    return `<tr class="${h.model === entry.model ? 'current' : ''}"><td>${modelName(h.model)}</td><td><span class="pill ${pill}">${label}</span></td><td>${prob}</td><td>${h.sec.toFixed(1)}초</td></tr>`;
+  }).join('');
+  $('history-body').innerHTML = `<table><thead><tr><th>모델</th><th>판정</th><th>Fake 확률</th><th>응답 시간</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+updateRunLabel();
+</script>
+</body>
+</html>
