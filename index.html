@@ -446,6 +446,21 @@
 const PAPER_URL = '';
 // ────────────────────────────────────────────────────────
 
+// ── 데모 영상 ──────────────────────────────────────────────
+// 1) 저장소에 올린 경우: 'assets/demo.mp4'
+// 2) 유튜브에 올린 경우: 'https://youtu.be/영상ID'
+const DEMO_VIDEO = '';
+
+(function () {
+  const box = document.getElementById('video');
+  if (!DEMO_VIDEO || !box) return;
+  const yt = DEMO_VIDEO.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
+  box.innerHTML = yt
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${yt[1]}" title="데모 영상" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="width:100%;height:100%;border:0"></iframe>`
+    : `<video src="${DEMO_VIDEO}" controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;background:#000"></video>`;
+})();
+// ────────────────────────────────────────────────────────
+
 document.querySelectorAll('[data-paper]').forEach(a => {
   if (PAPER_URL) {
     a.href = PAPER_URL;
